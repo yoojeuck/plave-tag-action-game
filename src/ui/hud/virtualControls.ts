@@ -1,6 +1,10 @@
 import type { Action } from "../../game/input/actions";
 import type { InputBindings } from "../../game/input/bindings";
 
+export interface VirtualControlsOptions {
+  enabled: boolean;
+}
+
 export interface VirtualControlsApi {
   destroy(): void;
 }
@@ -9,17 +13,24 @@ function bindHoldAction(button: HTMLButtonElement, onChange: (pressed: boolean) 
   button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     button.classList.add("active");
+    button.setPointerCapture(event.pointerId);
     onChange(true);
   });
 
-  const release = () => {
+  const release = (event?: PointerEvent) => {
+    if (event && button.hasPointerCapture(event.pointerId)) {
+      button.releasePointerCapture(event.pointerId);
+    }
     button.classList.remove("active");
     onChange(false);
   };
 
   button.addEventListener("pointerup", release);
   button.addEventListener("pointercancel", release);
-  button.addEventListener("pointerleave", release);
+  button.addEventListener("lostpointercapture", () => {
+    button.classList.remove("active");
+    onChange(false);
+  });
 }
 
 function makeActionButton(label: string, action: Action, bindings: InputBindings): HTMLButtonElement {
@@ -30,7 +41,19 @@ function makeActionButton(label: string, action: Action, bindings: InputBindings
   return button;
 }
 
-export function createVirtualControls(root: HTMLElement, bindings: InputBindings): VirtualControlsApi {
+export function createVirtualControls(
+  root: HTMLElement,
+  bindings: InputBindings,
+  options: VirtualControlsOptions
+): VirtualControlsApi {
+  if (!options.enabled) {
+    return {
+      destroy() {
+        bindings.resetMobileState();
+      }
+    };
+  }
+
   const layer = document.createElement("div");
   layer.className = "virtual-controls";
 
@@ -68,15 +91,13 @@ export function createVirtualControls(root: HTMLElement, bindings: InputBindings
 
   leftPad.append(moveLeft, moveRight);
 
-  const jumpBtn = makeActionButton("JUMP", "jump", bindings);
-  const attackBtn = makeActionButton("ATK", "attack", bindings);
-  const dashBtn = makeActionButton("DASH", "dash", bindings);
-  const tagBtn = makeActionButton("TAG", "tag_next", bindings);
-  const ultimateBtn = makeActionButton("ULT", "ultimate", bindings);
-  const pauseBtn = makeActionButton("PAUSE", "pause", bindings);
-  pauseBtn.classList.add("vc-small");
-
-  rightPad.append(jumpBtn, attackBtn, dashBtn, tagBtn, ultimateBtn, pauseBtn);
+  rightPad.append(
+    makeActionButton("JUMP", "jump", bindings),
+    makeActionButton("ATK", "attack", bindings),
+    makeActionButton("DASH", "dash", bindings),
+    makeActionButton("TAG", "tag_next", bindings),
+    makeActionButton("ULT", "ultimate", bindings)
+  );
 
   layer.append(leftPad, rightPad);
   root.append(layer);

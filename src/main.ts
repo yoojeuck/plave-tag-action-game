@@ -3,7 +3,7 @@ import "./styles.css";
 import { InputBindings } from "./game/input/bindings";
 import { SceneBridge } from "./phaser/adapters/sceneBridge";
 import { BootScene } from "./phaser/scenes/BootScene";
-import { GameScene } from "./phaser/scenes/GameScene";
+import { GameScene, type ShellState } from "./phaser/scenes/GameScene";
 import { createHud } from "./ui/hud/createHud";
 import { createVirtualControls } from "./ui/hud/virtualControls";
 
@@ -14,15 +14,46 @@ if (!canvasRoot || !hudRoot) {
   throw new Error("Root elements are missing.");
 }
 
+const touchMode =
+  window.matchMedia("(pointer: coarse)").matches ||
+  window.matchMedia("(hover: none)").matches ||
+  navigator.maxTouchPoints > 0;
+
+document.body.dataset.inputMode = touchMode ? "touch" : "keyboard";
+
 const inputBindings = new InputBindings();
 const bridge = new SceneBridge();
-const hud = createHud(hudRoot);
-const mobileControls = createVirtualControls(hudRoot, inputBindings);
+const shellState: ShellState = {
+  started: false,
+  touchMode,
+  pauseRequested: false
+};
+
+const hud = createHud(hudRoot, {
+  touchMode,
+  onStart: () => {
+    shellState.started = true;
+    hud.setStarted(true);
+  },
+  onPauseToggle: () => {
+    if (!shellState.started) {
+      shellState.started = true;
+      hud.setStarted(true);
+      return;
+    }
+    shellState.pauseRequested = true;
+  }
+});
+
+const mobileControls = createVirtualControls(hudRoot, inputBindings, {
+  enabled: touchMode
+});
 
 GameScene.configure({
   bridge,
   hud,
-  inputBindings
+  inputBindings,
+  shellState
 });
 
 const game = new Phaser.Game({
