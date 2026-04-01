@@ -65,6 +65,7 @@ export function createVirtualControls(
 
   let leftPressed = false;
   let rightPressed = false;
+
   const syncAxis = () => {
     if (leftPressed === rightPressed) {
       bindings.setMobileMove(0);
@@ -93,10 +94,10 @@ export function createVirtualControls(
 
   rightPad.append(
     makeActionButton("JUMP", "jump", bindings),
-    makeActionButton("ATK", "attack", bindings),
+    makeActionButton("POWER", "attack", bindings),
     makeActionButton("DASH", "dash", bindings),
     makeActionButton("TAG", "tag_next", bindings),
-    makeActionButton("ULT", "ultimate", bindings)
+    makeActionButton("SKILL", "ultimate", bindings)
   );
 
   layer.append(leftPad, rightPad);

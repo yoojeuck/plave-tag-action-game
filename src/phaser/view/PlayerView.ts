@@ -1,135 +1,104 @@
 import Phaser from "phaser";
+import type { MemberDefinition } from "../../game/platformer/types";
 
 export class PlayerView {
   readonly container: Phaser.GameObjects.Container;
-  readonly label: Phaser.GameObjects.Text;
 
   private readonly shadow: Phaser.GameObjects.Ellipse;
-  private readonly aura: Phaser.GameObjects.Ellipse;
-  private readonly trail: Phaser.GameObjects.Ellipse;
-  private readonly torso: Phaser.GameObjects.Rectangle;
-  private readonly coat: Phaser.GameObjects.Triangle;
-  private readonly sash: Phaser.GameObjects.Rectangle;
-  private readonly head: Phaser.GameObjects.Ellipse;
-  private readonly hairBack: Phaser.GameObjects.Ellipse;
-  private readonly hairFront: Phaser.GameObjects.Triangle;
-  private readonly visor: Phaser.GameObjects.Rectangle;
-  private readonly leftLeg: Phaser.GameObjects.Rectangle;
-  private readonly rightLeg: Phaser.GameObjects.Rectangle;
-  private readonly leftArm: Phaser.GameObjects.Rectangle;
-  private readonly rightArm: Phaser.GameObjects.Rectangle;
+  private readonly glow: Phaser.GameObjects.Ellipse;
+  private readonly sprite: Phaser.GameObjects.Image;
+  private readonly spark: Phaser.GameObjects.Arc;
   private facing: -1 | 1 = 1;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, color: number, labelText: string) {
+  constructor(scene: Phaser.Scene, x: number, y: number, member: MemberDefinition) {
     this.container = scene.add.container(x, y);
 
-    this.shadow = scene.add.ellipse(0, 19, 58, 18, 0x0b1623, 0.42);
-    this.aura = scene.add.ellipse(0, 6, 42, 62, color, 0.13);
-    this.trail = scene.add.ellipse(-8, 2, 20, 54, color, 0.18);
-    this.leftLeg = scene.add.rectangle(-8, 18, 9, 24, 0x081524, 0.95);
-    this.rightLeg = scene.add.rectangle(8, 18, 9, 24, 0x081524, 0.95);
-    this.leftArm = scene.add.rectangle(-18, -4, 8, 26, 0x0d2037, 0.95);
-    this.rightArm = scene.add.rectangle(18, -4, 8, 26, 0x0d2037, 0.95);
-    this.torso = scene.add.rectangle(0, -2, 30, 38, 0x16324a, 1);
-    this.coat = scene.add.triangle(0, 8, -18, -8, 18, -8, 0, 28, color, 0.78);
-    this.sash = scene.add.rectangle(0, 3, 26, 4, 0xe5f6ff, 0.82);
-    this.head = scene.add.ellipse(0, -28, 24, 27, 0xf7d9d4, 1);
-    this.hairBack = scene.add.ellipse(0, -33, 28, 26, color, 0.88);
-    this.hairFront = scene.add.triangle(0, -40, -15, -2, 15, -2, 0, 12, color, 0.92);
-    this.visor = scene.add.rectangle(0, -29, 18, 4, 0xf7ffff, 0.9);
+    this.shadow = scene.add.ellipse(0, 18, 42, 12, 0x07203b, 0.22);
+    this.glow = scene.add.ellipse(0, -4, 60, 72, member.accentColor, 0.16);
+    this.sprite = scene.add.image(0, -20, member.textureKey).setScale(0.74);
+    this.spark = scene.add.arc(0, -32, 10, 0, 360, false, member.accentColor, 0.22).setVisible(false);
 
-    this.container.add([
-      this.aura,
-      this.trail,
-      this.shadow,
-      this.leftLeg,
-      this.rightLeg,
-      this.leftArm,
-      this.rightArm,
-      this.torso,
-      this.coat,
-      this.sash,
-      this.hairBack,
-      this.head,
-      this.hairFront,
-      this.visor
-    ]);
+    this.container.add([this.glow, this.shadow, this.sprite, this.spark]);
+  }
 
-    this.label = scene.add
-      .text(x, y - 64, labelText.toUpperCase(), {
-        fontFamily: "Trebuchet MS, Verdana, sans-serif",
-        fontSize: "15px",
-        color: "#f2fbff",
-        fontStyle: "bold"
-      })
-      .setOrigin(0.5);
+  setMember(member: MemberDefinition): void {
+    this.sprite.setTexture(member.textureKey);
+    this.glow.setFillStyle(member.accentColor, 0.16);
+    this.spark.setFillStyle(member.accentColor, 0.22);
   }
 
   setPosition(x: number, y: number): void {
     this.container.setPosition(x, y);
-    this.label.setPosition(x, y - 64);
   }
 
   setFacing(facing: -1 | 1): void {
     this.facing = facing;
-    this.container.setScale(facing, 1);
+    this.sprite.setScale(0.74 * facing, 0.74);
   }
 
-  setAccentColor(color: number): void {
-    this.aura.setFillStyle(color, 0.13);
-    this.trail.setFillStyle(color, 0.18);
-    this.coat.setFillStyle(color, 0.78);
-    this.hairBack.setFillStyle(color, 0.88);
-    this.hairFront.setFillStyle(color, 0.92);
+  updatePose(params: { velocityX: number; airborne: boolean; dashing: boolean; timeMs: number }): void {
+    const motion = Math.abs(params.velocityX);
+    const bob = params.airborne ? -4 : Math.sin(params.timeMs / 95) * Math.min(3, motion * 0.02);
+    const lean = Phaser.Math.Clamp(params.velocityX * 0.04, -8, 8);
+    const squashY = params.airborne ? 0.95 : params.dashing ? 0.92 : 1;
+    const stretchX = params.airborne ? 1.05 : params.dashing ? 1.12 : 1;
+
+    this.sprite.setY(-20 + bob);
+    this.sprite.setAngle(lean * 0.5);
+    this.sprite.setScale(0.74 * this.facing * stretchX, 0.74 * squashY);
+    this.glow.alpha = params.dashing ? 0.28 : 0.16;
+    this.glow.setScale(params.dashing ? 1.18 : 1, params.airborne ? 1.05 : 1);
+    this.shadow.scaleX = params.airborne ? 0.82 : 1;
   }
 
-  setLabel(text: string): void {
-    this.label.setText(text.toUpperCase());
-  }
-
-  updatePose(params: { speed: number; airborne: boolean; timeMs: number }): void {
-    const motion = Math.abs(params.speed);
-    const bob = params.airborne ? -4 : Math.sin(params.timeMs / 145) * Math.min(4, motion * 0.018);
-    const armSwing = params.airborne ? -8 : Math.sin(params.timeMs / 95) * Math.min(8, motion * 0.04);
-    const legSwing = params.airborne ? 3 : Math.sin(params.timeMs / 90) * Math.min(6, motion * 0.03);
-
-    this.container.y += 0;
-    this.torso.setAngle(armSwing * 0.12);
-    this.leftArm.setAngle(-armSwing);
-    this.rightArm.setAngle(armSwing);
-    this.leftLeg.setAngle(legSwing);
-    this.rightLeg.setAngle(-legSwing);
-    this.aura.y = 6 + bob * 0.4;
-    this.trail.alpha = motion > 30 ? 0.3 : 0.14;
-    this.shadow.scaleX = motion > 30 ? 0.92 : 1;
-    this.container.setY(this.container.y + 0);
-    this.label.setY(this.container.y - 64 + bob * 0.25);
-  }
-
-  triggerAttackPulse(): void {
+  triggerJump(): void {
     this.container.scene.tweens.add({
-      targets: [this.container, this.aura],
-      scaleX: this.facing * 1.08,
-      scaleY: 0.95,
-      alpha: { from: 1, to: 0.92 },
-      duration: 80,
+      targets: this.glow,
+      scaleX: 1.28,
+      scaleY: 1.14,
+      alpha: { from: 0.35, to: 0.08 },
+      duration: 180
+    });
+  }
+
+  triggerAttack(): void {
+    this.container.scene.tweens.add({
+      targets: this.sprite,
+      angle: { from: -4 * this.facing, to: 7 * this.facing },
+      duration: 90,
       yoyo: true
     });
   }
 
-  triggerTagPulse(): void {
+  triggerSpecial(): void {
+    this.spark.setVisible(true);
+    this.spark.setScale(0.4);
+    this.spark.alpha = 0.7;
     this.container.scene.tweens.add({
-      targets: this.aura,
-      scaleX: 1.45,
-      scaleY: 1.3,
-      alpha: { from: 0.55, to: 0.1 },
-      duration: 220,
-      yoyo: false
+      targets: this.spark,
+      scaleX: 2.1,
+      scaleY: 2.1,
+      alpha: 0,
+      duration: 260,
+      onComplete: () => {
+        this.spark.setVisible(false);
+        this.spark.alpha = 0.22;
+        this.spark.setScale(1);
+      }
+    });
+  }
+
+  triggerHit(): void {
+    this.container.scene.tweens.add({
+      targets: this.sprite,
+      alpha: { from: 0.35, to: 1 },
+      duration: 70,
+      repeat: 4,
+      yoyo: true
     });
   }
 
   destroy(): void {
     this.container.destroy(true);
-    this.label.destroy();
   }
 }
